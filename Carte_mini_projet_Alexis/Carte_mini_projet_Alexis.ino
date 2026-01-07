@@ -1,6 +1,6 @@
 /*********************************************************
- * Arduino Mega – Accès RFID ↔ Raspberry Pi
- * Version finale professionnelle (non bloquante)
+ * Programme Serrure Codée (partie Arduino)
+ * V1.0
  *********************************************************/
 int num_lecteur = 0;
 #define STX 0x02
@@ -18,9 +18,6 @@ int num_lecteur = 0;
 #define LED_RED_2   48
 
 // ================== Timings ===================
-#define GREEN_ON_TIME     2000
-#define RED_BLINK_TIME     300
-#define RED_BLINK_COUNT      3
 #define BUTTON_TIME       3000
 
 // ================== Structures =================
@@ -35,21 +32,6 @@ SerialReceiver receivers[] = {
   { Serial2, {}, 0, false },
   { Serial3, {}, 0, false }
 };
-
-// ================== LED State Machine ==========
-enum LedMode {
-  LED_IDLE,
-  LED_GREEN_ON,
-  LED_RED_BLINK
-};
-
-LedMode ledMode = LED_IDLE;
-unsigned long ledTimer = 0;
-uint8_t redBlinkCounter = 0;
-bool redLedState = false;
-
-// ================== États système ===============
-bool waitingRaspberry = false;
 
 // ================== Bouton =====================
 unsigned long buttonTimer = 0;
@@ -120,16 +102,13 @@ void handleSerialInputs() {
       if (!receivers[r].receiving) continue;
 
       if (b == ETX) {
-        if (receivers[r].index == DATA_LENGTH && !waitingRaspberry) {
+        if (receivers[r].index == DATA_LENGTH) {
 
           // 📤 Envoi vers Raspberry Pi
           Serial1.write(&receivers[r].buffer[DATA_LENGTH - PART_LENGTH], PART_LENGTH);
           Serial1.print(',');
           Serial1.println(r);
           num_lecteur = r;
-
-          waitingRaspberry = true;
-
           Serial.print(F("Donnee envoyee depuis Serial"));
           Serial.println(r + 2);
         }
@@ -149,7 +128,7 @@ void handleSerialInputs() {
 void handleRaspberryResponse() {
   static String rxLine = "";
 
-  if (!waitingRaspberry) return;
+  //if (!waitingRaspberry) return;
 
   while (Serial1.available()) {
     char c = Serial1.read();
@@ -163,8 +142,10 @@ void handleRaspberryResponse() {
       else if (rxLine == "KO") {
         NonAutorise(num_lecteur);       // 🔴 Refusé
       }
+      if (rxLine == "WEB") {
+        OuvertureOK(2);        // 🟢 Autorisé
+      }
 
-      waitingRaspberry = false;
       rxLine = "";
     }
     else {
@@ -179,6 +160,11 @@ void OuvertureOK(int num_lecteur) {
   allLedsOff();
   if (num_lecteur==1){
   digitalWrite(LED_GREEN_1, HIGH);
+  }
+  else if (num_lecteur==2){
+  digitalWrite(LED_GREEN_1, HIGH);
+  digitalWrite(LED_GREEN_2, HIGH);
+
   }
   else {
   digitalWrite(LED_GREEN_2, HIGH);
@@ -210,11 +196,6 @@ void NonAutorise(int num_lecteur) {
   }
   digitalWrite(LED_GREEN_1, LOW);
   digitalWrite(LED_GREEN_2, LOW);
-}
-
-void setRedLeds(bool state) {
-  digitalWrite(LED_RED_1, state);
-  digitalWrite(LED_RED_2, state);
 }
 
 void allLedsOff() {
