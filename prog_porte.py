@@ -1,9 +1,15 @@
 from pymysql import*
 from serial import*
+import os
+from time import*
 db=connect(host="localhost",user="root",password="DylanHugoAlexis",database="serrure")
 cur = db.cursor()
 ser = Serial("/dev/serial0",9600, timeout=1)
 while True:
+    if os.path.exists("/var/doorcontroller/open_door.txt"): # ouvre la gache si le fichier d'ouverture est présent
+        os.unlink("/var/doorcontroller/open_door.txt")  # effacer le fichier d'ouverture
+        print("Requete d'ouverture externe recue! Ouverture de la gache...")
+        ser.write("WEB\n".encode())
     line = ser.readline()
     if line:
         try:
